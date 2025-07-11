@@ -29,6 +29,7 @@ async function run() {
 		const usersCollection = client.db("BloodAid").collection("users");
 		const donations = client.db("BloodAid").collection("donations");
 		const myDonations = client.db("BloodAid").collection("myDonations");
+		const blogs = client.db("BloodAid").collection("blogs");
 
 		app.post("/users", async (req, res) => {
 			const userData = req.body;
@@ -67,11 +68,16 @@ async function run() {
 			if (bloodGroup) query.bloodGroup = bloodGroup;
 			if (district) query.district = district;
 			if (upazila) query.upazila = upazila;
-         
 
 			const result = await usersCollection.find(query).toArray();
 			res.send(result);
 		});
+
+		app.get("/blogs", async(req, res)=>{
+			const status = req.query.status;
+			const result = await blogs.find({status: status}).toArray()
+			res.send(result)
+		})
 
 		//donation request part
 
@@ -119,7 +125,6 @@ async function run() {
 
 		app.get("/recent", async (req, res) => {
 			const { email, limit, sort } = req.query;
-			
 
 			const result = await donations
 				.find({ requesterEmail: email })
@@ -156,8 +161,141 @@ async function run() {
 
 		app.get("/myDonations", async (req, res) => {
 			const email = req.query.email;
-		
+
 			const result = await myDonations.find({ donorEmail: email }).toArray();
+			res.send(result);
+		});
+
+		//admin parts
+
+		app.get("/totalDonationRequests", async (req, res) => {
+			const result = await donations.countDocuments();
+			res.send(result);
+		});
+
+		app.get("/recent-users", async (req, res) => {
+			const users = await usersCollection
+				.find()
+				.sort({ _id: -1 }) // sort by creation time descending
+				.limit(5)
+				.toArray();
+
+			res.send(users);
+		});
+
+		//get total users
+		app.get("/totalUsers", async (req, res) => {
+			try {
+				const page = parseInt(req.query.page) || 1;
+				const limit = parseInt(req.query.limit) || 10;
+				const status = req.query.status;
+				const email = req.query.email;
+
+				const query = {};
+
+				if (status) {
+					query.status = status; // "active" | "blocked"
+				}
+
+				if (email) {
+					query.email = { $regex: email, $options: "i" }; // case-insensitive partial match
+				}
+
+				const totalUsers = await usersCollection.countDocuments(query);
+				const totalPages = Math.ceil(totalUsers / limit);
+
+				const users = await usersCollection
+					.find(query)
+					.skip((page - 1) * limit)
+					.limit(limit)
+					.toArray();
+
+				res.send({ users, totalPages });
+			} catch (error) {
+				console.error("Error fetching users:", error.message);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		app.patch("/users/:id", async (req, res) => {
+			try {
+				const id = req.params.id;
+				const action = req.body.action;
+
+				let updateDoc = {};
+
+				switch (action) {
+					case "block":
+						updateDoc = { $set: { status: "blocked" } };
+						break;
+					case "unblock":
+						updateDoc = { $set: { status: "active" } };
+						break;
+					case "makeVolunteer":
+						updateDoc = { $set: { role: "volunteer" } };
+						break;
+					case "makeDonor":
+						updateDoc = { $set: { role: "donor" } };
+						break;
+					case "makeAdmin":
+						updateDoc = { $set: { role: "admin" } };
+						break;
+					default:
+						return res.status(400).send({ error: "Invalid action" });
+				}
+
+				const result = await usersCollection.updateOne(
+					{ _id: new ObjectId(id) },
+					updateDoc
+				);
+
+				if (result.modifiedCount === 0) {
+					return res
+						.status(404)
+						.send({ error: "User not found or already updated" });
+				}
+
+				res.send({ success: true });
+			} catch (error) {
+				console.error("Error updating user:", error.message);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		app.post("/blogs", async (req, res) => {
+			const blog = req.body;
+			const result = await blogs.insertOne(blog);
+			res.send(result);
+		});
+
+		// GET /blogs (with optional status filter)
+		app.get("/blogs", async (req, res) => {
+			const { status } = req.query;
+			const query = status ? { status } : {};
+			const blog = await blogs.find(query).sort({ createdAt: -1 }).toArray();
+			res.send(blog);
+		});
+
+		// PATCH /blogs/:id (publish/unpublish)
+		app.patch("/blogs/:id", async (req, res) => {
+			const { id } = req.params;
+			const { action } = req.body;
+
+			const update = {};
+			if (action === "publish") update.status = "published";
+			else if (action === "unpublish") update.status = "draft";
+
+			const result = await blogs.updateOne(
+				{ _id: new ObjectId(id) },
+				{ $set: update }
+			);
+			res.send(result);
+		});
+
+		// DELETE /blogs/:id
+		app.delete("/blogs/:id", async (req, res) => {
+			const { id } = req.params;
+			const result = await blogs.deleteOne({ _id: new ObjectId(id) });
 			res.send(result);
 		});
 
