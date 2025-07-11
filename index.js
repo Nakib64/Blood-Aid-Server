@@ -73,9 +73,46 @@ async function run() {
 			res.send(result);
 		});
 
-		app.get("/blogs", async(req, res)=>{
-			const status = req.query.status;
-			const result = await blogs.find({status: status}).toArray()
+		// GET /blogs
+		app.get("/blogs", async (req, res) => {
+			const page = parseInt(req.query.page) || 1;
+			const limit = parseInt(req.query.limit) || 3;
+			const status = req.query.status || "published";
+
+			const skip = (page - 1) * limit;
+
+			const filter = { status };
+
+			const blog = await blogs
+				.find(filter)
+				.sort({ createdAt: -1 })
+				.skip(skip)
+				.limit(limit)
+				.toArray();
+
+			const totalCount = await blogs.countDocuments(filter);
+			const totalPages = Math.ceil(totalCount / limit);
+
+			res.send({
+				blog,
+				totalPages,
+				currentPage: page,
+			});
+		});
+
+		//get blog by id
+		app.get('/blog/:id', async(req, res)=>{
+			const id = req.params.id
+			const result = await blogs.findOne({_id: new ObjectId(id)})
+			res.send(result)
+		})
+
+		//patch blog
+		app.patch('/blog/:id', async(req, res)=>{
+			const id = req.params.id;
+			const data = req.body;
+
+			const result = await blogs.updateOne({_id: new ObjectId(id)},{$set: data})
 			res.send(result)
 		})
 
