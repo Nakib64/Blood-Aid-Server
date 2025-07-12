@@ -77,6 +77,27 @@ async function run() {
 			res.send(result);
 		});
 
+		app.get("/SearchedUsers", async (req, res) => {
+			const { bloodGroup, district, upazila, page = 1, limit = 6 } = req.query;
+
+			const query = {};
+			if (bloodGroup) query.bloodGroup = bloodGroup;
+			if (district) query.district = district;
+			if (upazila) query.upazila = upazila;
+
+			const skip = (parseInt(page) - 1) * parseInt(limit);
+
+			const users = await usersCollection
+				.find(query)
+				.skip(skip)
+				.limit(parseInt(limit))
+				.toArray();
+
+			const total = await usersCollection.countDocuments(query);
+
+			res.send({ users, total });
+		});
+
 		// GET /blogs
 		app.get("/blogs", async (req, res) => {
 			const page = parseInt(req.query.page) || 1;
@@ -382,18 +403,20 @@ async function run() {
 		});
 
 		//get total donation
-		app.get('/totalDonations', async(req, res)=>{
-			const result = await donationsCollection.aggregate([
-				{
-					$group: {
-						_id: null,
-						totalDonation: {$sum: "$amount"},
-					}
-				}
-			]).toArray()
+		app.get("/totalDonations", async (req, res) => {
+			const result = await donationsCollection
+				.aggregate([
+					{
+						$group: {
+							_id: null,
+							totalDonation: { $sum: "$amount" },
+						},
+					},
+				])
+				.toArray();
 			const total = result[0]?.totalDonation || 0;
-			res.send(total)
-		})
+			res.send(total);
+		});
 
 		app.get("/", (req, res) => {
 			res.send("hlw world");
