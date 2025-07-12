@@ -5,7 +5,11 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
+const Stripe = require("stripe");
 
+const stripe = Stripe(
+	"sk_test_51Rel8QPC60YcOyoh8fkkpeqygoKk3Poah4RQoJbhSEikgc2QWQYLdAOHr7ynhqaFvgUDlxqdwM5yRDNJI9YWXZS200x7Ug5KuI"
+);
 app.use(cors());
 app.use(express.json());
 
@@ -30,7 +34,7 @@ async function run() {
 		const donations = client.db("BloodAid").collection("donations");
 		const myDonations = client.db("BloodAid").collection("myDonations");
 		const blogs = client.db("BloodAid").collection("blogs");
-
+		const donationsCollection = client.db("BloodAid").collection("funding");
 		app.post("/users", async (req, res) => {
 			const userData = req.body;
 			const result = await usersCollection.insertOne(userData);
@@ -101,20 +105,23 @@ async function run() {
 		});
 
 		//get blog by id
-		app.get('/blog/:id', async(req, res)=>{
-			const id = req.params.id
-			const result = await blogs.findOne({_id: new ObjectId(id)})
-			res.send(result)
-		})
+		app.get("/blog/:id", async (req, res) => {
+			const id = req.params.id;
+			const result = await blogs.findOne({ _id: new ObjectId(id) });
+			res.send(result);
+		});
 
 		//patch blog
-		app.patch('/blog/:id', async(req, res)=>{
+		app.patch("/blog/:id", async (req, res) => {
 			const id = req.params.id;
 			const data = req.body;
 
-			const result = await blogs.updateOne({_id: new ObjectId(id)},{$set: data})
-			res.send(result)
-		})
+			const result = await blogs.updateOne(
+				{ _id: new ObjectId(id) },
+				{ $set: data }
+			);
+			res.send(result);
+		});
 
 		//donation request part
 
@@ -335,6 +342,58 @@ async function run() {
 			const result = await blogs.deleteOne({ _id: new ObjectId(id) });
 			res.send(result);
 		});
+
+		//funding
+
+		app.post("/api/donation/create-intent", async (req, res) => {
+			const { amount } = req.body;
+			try {
+				const paymentIntent = await stripe.paymentIntents.create({
+					amount,
+					currency: "bdt",
+					automatic_payment_methods: { enabled: true },
+				});
+				res.send({ clientSecret: paymentIntent.client_secret });
+			} catch (err) {
+				res.status(500).send({ error: err.message });
+			}
+		});
+
+		// Save Donation
+		app.post("/api/donation/save", async (req, res) => {
+			const { name, email, amount } = req.body;
+			const donation = { name, email, amount, date: new Date() };
+			try {
+				await donationsCollection.insertOne(donation);
+				res.send({ success: true });
+			} catch (err) {
+				res.status(500).send({ error: err.message });
+			}
+		});
+
+		// Get Recent Donations
+		app.get("/api/donation/all", async (req, res) => {
+			const donations = await donationsCollection
+				.find()
+				.sort({ date: -1 })
+				.limit(10)
+				.toArray();
+			res.send(donations);
+		});
+
+		//get total donation
+		app.get('/totalDonations', async(req, res)=>{
+			const result = await donationsCollection.aggregate([
+				{
+					$group: {
+						_id: null,
+						totalDonation: {$sum: "$amount"},
+					}
+				}
+			]).toArray()
+			const total = result[0]?.totalDonation || 0;
+			res.send(total)
+		})
 
 		app.get("/", (req, res) => {
 			res.send("hlw world");
