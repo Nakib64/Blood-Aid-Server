@@ -77,8 +77,15 @@ async function run() {
 			res.send(result);
 		});
 
+		app.get("/totalUser", async (req, res) => {
+			const result = await usersCollection.countDocuments();
+
+			res.send(result);
+		});
+
+
 		app.get("/SearchedUsers", async (req, res) => {
-			const { bloodGroup, district, upazila, page = 1, limit = 6 } = req.query;
+			const { bloodGroup, district, upazila, page = 1, limit = 12 } = req.query;
 
 			const query = {};
 			if (bloodGroup) query.bloodGroup = bloodGroup;
@@ -86,16 +93,14 @@ async function run() {
 			if (upazila) query.upazila = upazila;
 
 			const skip = (parseInt(page) - 1) * parseInt(limit);
-
+			const totalPage = Math.ceil(parseInt((await usersCollection.countDocuments(query))))
 			const users = await usersCollection
 				.find(query)
 				.skip(skip)
 				.limit(parseInt(limit))
 				.toArray();
 
-			const total = await usersCollection.countDocuments(query);
-
-			res.send({ users, total });
+			res.send({ users, totalPage });
 		});
 
 		// GET /blogs
@@ -366,6 +371,12 @@ async function run() {
 
 		//funding
 
+		app.post("/bulk", async (req, res) => {
+			const users = req.body;
+			const result = await donations.insertMany(users);
+			res.send(result);
+		});
+
 		app.post("/api/donation/create-intent", async (req, res) => {
 			const { amount } = req.body;
 			try {
@@ -425,7 +436,7 @@ async function run() {
 		app.listen(port, () => {
 			console.log(`server running on the port ${port}`);
 		});
-		console.log("Pinged your deployment. You successfully connected to MongoDB!");
+		
 	} finally {
 	}
 }
