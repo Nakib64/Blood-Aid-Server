@@ -150,11 +150,15 @@ async function run() {
 		app.get("/blogs", async (req, res) => {
 			const page = parseInt(req.query.page) || 1;
 			const limit = parseInt(req.query.limit) || 3;
-			const status = req.query.status || "published";
+			const status = req.query.status 
 
+			console.log(status);
 			const skip = (page - 1) * limit;
 
-			const filter = { status };
+			const filter = { };
+			if(status){
+				filter.status = status
+			}
 
 			const blog = await blogs
 				.find(filter)
@@ -471,6 +475,16 @@ async function run() {
 			const total = result[0]?.totalDonation || 0;
 			res.send(total);
 		});
+
+		app.get('/donors', async(req, res)=>{
+			const id = req.query.id;
+			const query = {}
+			if(id){
+				query._id = new ObjectId(id)
+			}
+			const result = await usersCollection.findOne(query)
+			res.send(result)
+		})
 
 		app.get("/", (req, res) => {
 			res.send("hlw world");
