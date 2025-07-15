@@ -1,6 +1,12 @@
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+require("dotenv").config()
+
+const admin = require("firebase-admin");
+const serviceAccount = require("./bloodaid-f4332-firebase-adminsdk-fbsvc-6daebc3a13.json");
+admin.initializeApp({
+		credential: admin.credential.cert(serviceAccount),
+	});
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
@@ -35,6 +41,39 @@ async function run() {
 		const myDonations = client.db("BloodAid").collection("myDonations");
 		const blogs = client.db("BloodAid").collection("blogs");
 		const donationsCollection = client.db("BloodAid").collection("funding");
+
+
+
+		const verifyFirebaseToken=async(req, res, next)=>{
+			const authHeader = req.headers?.authorization
+
+
+			if(!authHeader || !authHeader.startsWith('Bearer ')){
+				return res.status(401).send({message: 'unauthorized access'})
+			}
+
+			const token= authHeader.split(' ')[1]
+
+
+			try{
+			const decoded = await admin.auth().verifyIdToken(token)
+			req.decoded = decoded
+				next()
+			}
+			catch(error){
+				return res.status(401).send({message: 'unauthorized access'})
+			}
+
+			
+		}
+
+		const verifyEmail=async(req, res, next)=>{
+			if(req.query.email !== req.decoded.email){
+				return res.status(403).send({message: 'unauthorized access'})
+			}
+			next()
+		}
+
 		app.post("/users", async (req, res) => {
 			const userData = req.body;
 			const result = await usersCollection.insertOne(userData);
@@ -52,12 +91,16 @@ async function run() {
 			res.send(result);
 		});
 
-		app.get("/users", async (req, res) => {
+		app.get("/users",verifyFirebaseToken,verifyEmail, async (req, res) => {
 			const query = {};
 			const email = req.query.email;
 			const id = req.query.id;
+
+			
 			if (email) {
+			
 				query.email = email;
+				
 				const result = await usersCollection.findOne(query);
 				res.send(result);
 				return;
