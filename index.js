@@ -17,7 +17,7 @@ const stripe = Stripe(
 	"sk_test_51Rel8QPC60YcOyoh8fkkpeqygoKk3Poah4RQoJbhSEikgc2QWQYLdAOHr7ynhqaFvgUDlxqdwM5yRDNJI9YWXZS200x7Ug5KuI"
 );
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); 
 
 const uri = `mongodb+srv://${process.env.DBUSER}:${process.env.DBPASSWORD}@cluster0.rcnlifl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
