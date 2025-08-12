@@ -14,7 +14,7 @@ const port = process.env.PORT || 3000;
 const Stripe = require("stripe");
 
 const stripe = Stripe(
-	"sk_test_51Rel8QPC60YcOyoh8fkkpeqygoKk3Poah4RQoJbhSEikgc2QWQYLdAOHr7ynhqaFvgUDlxqdwM5yRDNJI9YWXZS200x7Ug5KuI"
+	process.env.STRIPE
 );
 app.use(cors());
 app.use(express.json()); 
