@@ -3,7 +3,7 @@ const cors = require("cors");
 require("dotenv").config()
 
 const admin = require("firebase-admin");
-const serviceAccount = require("./bloodaid-f4332-firebase-adminsdk-fbsvc-6daebc3a13.json");
+const serviceAccount = require(process.env.SERVICE_ACCOUNT);
 admin.initializeApp({
 		credential: admin.credential.cert(serviceAccount),
 	});
