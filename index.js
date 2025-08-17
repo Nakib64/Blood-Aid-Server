@@ -140,6 +140,7 @@ async function run() {
 			const users = await usersCollection
 				.find(query)
 				.skip(skip)
+				.sort({ _id: -1 })
 				.limit(parseInt(limit))
 				.toArray();
 
