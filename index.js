@@ -1,23 +1,20 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config()
 
 const admin = require("firebase-admin");
-const serviceAccount = require(process.env.SERVICE_ACCOUNT);
+const serviceAccount = require("./bloodaid-f4332-firebase-adminsdk-fbsvc-6daebc3a13.json");
 admin.initializeApp({
-		credential: admin.credential.cert(serviceAccount),
-	});
+	credential: admin.credential.cert(serviceAccount),
+});
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 const Stripe = require("stripe");
-
-const stripe = Stripe(
-	process.env.STRIPE
-);
+const stripe = Stripe(process.env.STRIPE);
 app.use(cors());
-app.use(express.json()); 
+app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DBUSER}:${process.env.DBPASSWORD}@cluster0.rcnlifl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -26,14 +23,12 @@ const client = new MongoClient(uri, {
 	serverApi: {
 		version: ServerApiVersion.v1,
 		strict: true,
-		deprecationErrors: true, 
+		deprecationErrors: true,
 	},
 });
 
 async function run() {
 	try {
-		await client.connect()
-
 		await client.db("admin").command({ ping: 1 });
 
 		const usersCollection = client.db("BloodAid").collection("users");
@@ -42,37 +37,30 @@ async function run() {
 		const blogs = client.db("BloodAid").collection("blogs");
 		const donationsCollection = client.db("BloodAid").collection("funding");
 
+		const verifyFirebaseToken = async (req, res, next) => {
+			const authHeader = req.headers?.authorization;
 
-
-		const verifyFirebaseToken=async(req, res, next)=>{
-			const authHeader = req.headers?.authorization
-
-
-			if(!authHeader || !authHeader.startsWith('Bearer ')){
-				return res.status(401).send({message: 'unauthorized access'})
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				return res.status(401).send({ message: "unauthorized access" });
 			}
 
-			const token= authHeader.split(' ')[1]
+			const token = authHeader.split(" ")[1];
 
-
-			try{
-			const decoded = await admin.auth().verifyIdToken(token)
-			req.decoded = decoded
-				next()
+			try {
+				const decoded = await admin.auth().verifyIdToken(token);
+				req.decoded = decoded;
+				next();
+			} catch (error) {
+				return res.status(401).send({ message: "unauthorized access" });
 			}
-			catch(error){
-				return res.status(401).send({message: 'unauthorized access'})
-			}
+		};
 
-			
-		}
-
-		const verifyEmail=async(req, res, next)=>{
-			if(req.query.email !== req.decoded.email){
-				return res.status(403).send({message: 'unauthorized access'})
+		const verifyEmail = async (req, res, next) => {
+			if (req.query.email !== req.decoded.email) {
+				return res.status(403).send({ message: "unauthorized access" });
 			}
-			next()
-		}
+			next();
+		};
 
 		app.post("/users", async (req, res) => {
 			const userData = req.body;
@@ -91,16 +79,14 @@ async function run() {
 			res.send(result);
 		});
 
-		app.get("/users",verifyFirebaseToken,verifyEmail, async (req, res) => {
+		app.get("/users", verifyFirebaseToken, verifyEmail, async (req, res) => {
 			const query = {};
 			const email = req.query.email;
 			const id = req.query.id;
 
-			
 			if (email) {
-			
 				query.email = email;
-				
+
 				const result = await usersCollection.findOne(query);
 				res.send(result);
 				return;
@@ -126,7 +112,6 @@ async function run() {
 			res.send(result);
 		});
 
-
 		app.get("/SearchedUsers", async (req, res) => {
 			const { bloodGroup, district, upazila, page = 1, limit = 12 } = req.query;
 
@@ -136,7 +121,9 @@ async function run() {
 			if (upazila) query.upazila = upazila;
 
 			const skip = (parseInt(page) - 1) * parseInt(limit);
-			const totalPage = Math.ceil(parseInt((await usersCollection.countDocuments(query))))
+			const totalPage = Math.ceil(
+				parseInt(await usersCollection.countDocuments(query))
+			);
 			const users = await usersCollection
 				.find(query)
 				.skip(skip)
@@ -151,14 +138,14 @@ async function run() {
 		app.get("/blogs", async (req, res) => {
 			const page = parseInt(req.query.page) || 1;
 			const limit = parseInt(req.query.limit) || 3;
-			const status = req.query.status 
+			const status = req.query.status;
 
 			console.log(status);
 			const skip = (page - 1) * limit;
 
-			const filter = { };
-			if(status){
-				filter.status = status
+			const filter = {};
+			if (status) {
+				filter.status = status;
 			}
 
 			const blog = await blogs
@@ -441,8 +428,8 @@ async function run() {
 
 		// Save Donation
 		app.post("/api/donation/save", async (req, res) => {
-			const { name, email, amount } = req.body;
-			const donation = { name, email, amount, date: new Date() };
+			const { name, email, amount, date } = req.body;
+			const donation = { name, email, amount, date};
 			try {
 				await donationsCollection.insertOne(donation);
 				res.send({ success: true });
@@ -477,15 +464,15 @@ async function run() {
 			res.send(total);
 		});
 
-		app.get('/donors', async(req, res)=>{
+		app.get("/donors", async (req, res) => {
 			const id = req.query.id;
-			const query = {}
-			if(id){
-				query._id = new ObjectId(id)
+			const query = {};
+			if (id) {
+				query._id = new ObjectId(id);
 			}
-			const result = await usersCollection.findOne(query)
-			res.send(result)
-		})
+			const result = await usersCollection.findOne(query);
+			res.send(result);
+		});
 
 		app.get("/", (req, res) => {
 			res.send("hlw world");
@@ -494,7 +481,6 @@ async function run() {
 		app.listen(port, () => {
 			console.log(`server running on the port ${port}`);
 		});
-		
 	} finally {
 	}
 }
